@@ -93,7 +93,14 @@ function route() {
     render(target); window.scrollTo({top:0,behavior:'instant'});
   } else {
     openHome();
-    requestAnimationFrame(() => { const section=document.getElementById(target); if(section && target !== 'lesson' && !target.startsWith('section-')) section.scrollIntoView(); else window.scrollTo({top:0,behavior:'instant'}); });
+    requestAnimationFrame(() => {
+      const section=document.getElementById(target);
+      if (target === 'flow') {
+        const layout=section.querySelector('.flow-layout');
+        window.scrollTo({top:window.scrollY+layout.getBoundingClientRect().top-(matchMedia('(max-width:760px)').matches?77:105),behavior:'instant'});
+      } else if(section && target !== 'lesson' && !target.startsWith('section-')) section.scrollIntoView();
+      else window.scrollTo({top:0,behavior:'instant'});
+    });
   }
 }
 window.addEventListener('hashchange', route);
