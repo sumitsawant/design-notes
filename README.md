@@ -19,3 +19,9 @@ No personal account credentials or runtime secrets are required. Only the three 
 Written and maintained by Sumit Sawant. Sources are linked in each lesson. Scenarios are learning examples, not benchmarks. Feedback: sumitsawant75@gmail.com.
 
 All rights reserved. The site is publicly readable; no redistribution license is granted.
+
+## Logo
+
+Editable Figma identity: https://www.figma.com/design/qA814U1O7Nbi774aNdc134
+
+`logo.svg` is exported from the Figma decision-path monogram.
