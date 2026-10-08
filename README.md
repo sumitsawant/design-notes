@@ -35,3 +35,7 @@ Each lesson contains a problem, requirements, a system diagram, a request sequen
 ## Reading view
 
 The home page introduces the guide. Lesson links open a separate reading view with a lesson index, section links, a PDF control, and next-lesson navigation. Read status is stored in browser localStorage. No account or server is required. If browser storage is unavailable, progress lasts for the current session.
+
+## Cover effect
+
+The cover uses a small WebGL shader for a decorative system field. It uses no external library or credential. CSS supplies the static cover when WebGL is unavailable. The shader draws one frame when reduced motion is enabled. It pauses while the cover is off-screen or the tab is hidden.
