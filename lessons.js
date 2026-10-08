@@ -1,0 +1,810 @@
+'use strict';
+const lessons = {
+  "cache": {
+    "name": "Caching",
+    "label": "01 / PERFORMANCE",
+    "title": "Reduce repeated database reads.",
+    "intro": "Store a copy of frequently used data in a cache. Define when the copy can be stale.",
+    "problem": "A product page receives many requests for the same items. Repeated database reads increase response time.",
+    "requirements": [
+      "Keep the database as the source of truth.",
+      "Define an acceptable delay before a price change appears on a product page.",
+      "Check the current price and stock when a customer places an order.",
+      "Limit database traffic if the cache fails."
+    ],
+    "architecture": {
+      "nodes": [
+        [
+          "Client",
+          "Reads a product"
+        ],
+        [
+          "Application API",
+          "Controls cache access"
+        ],
+        [
+          "Cache",
+          "Stores a temporary copy"
+        ],
+        [
+          "Database",
+          "Stores the product"
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1,
+          "Request"
+        ],
+        [
+          1,
+          2,
+          "Look up item"
+        ],
+        [
+          1,
+          3,
+          "Read on miss"
+        ]
+      ]
+    },
+    "sequence": {
+      "title": "Request sequence / Cache miss",
+      "actors": [
+        "Client",
+        "API",
+        "Cache",
+        "Database"
+      ],
+      "steps": [
+        [
+          0,
+          1,
+          "Get product"
+        ],
+        [
+          1,
+          2,
+          "Look up key"
+        ],
+        [
+          2,
+          1,
+          "Key is absent"
+        ],
+        [
+          1,
+          3,
+          "Read product"
+        ],
+        [
+          3,
+          1,
+          "Return product"
+        ],
+        [
+          1,
+          2,
+          "Store copy with expiry"
+        ],
+        [
+          1,
+          0,
+          "Return product"
+        ]
+      ]
+    },
+    "recovery": {
+      "title": "Recovery / Cache is unavailable",
+      "actors": [
+        "Client",
+        "API",
+        "Cache",
+        "Database"
+      ],
+      "steps": [
+        [
+          0,
+          1,
+          "Get product"
+        ],
+        [
+          1,
+          2,
+          "Look up key"
+        ],
+        [
+          1,
+          1,
+          "Cache request times out"
+        ],
+        [
+          1,
+          1,
+          "Check the database traffic limit"
+        ],
+        [
+          1,
+          3,
+          "Read only if capacity is available"
+        ],
+        [
+          3,
+          1,
+          "Return product"
+        ],
+        [
+          1,
+          0,
+          "Return product"
+        ]
+      ]
+    },
+    "recoveryNote": "If the database traffic limit is reached, reject the request or serve an allowed stale copy. A cache failure must not cause unlimited database traffic.",
+    "scenarios": [
+      [
+        "Cache unavailable",
+        "Use a short timeout. Limit concurrent database reads. Reject excess requests when the database cannot accept more work."
+      ],
+      [
+        "Popular key expires",
+        "Combine concurrent requests for the same key into one database read. Vary expiry times across keys to reduce simultaneous misses."
+      ],
+      [
+        "Price changes",
+        "Invalidate the cached item after the database update. A concurrent read can still insert an old value. Check the authoritative price during checkout."
+      ]
+    ],
+    "choices": [
+      [
+        "Cache-aside",
+        "The application reads and fills the cache.",
+        "The application must handle misses and invalidation."
+      ],
+      [
+        "Read directly",
+        "The database returns the current committed data under its isolation rules.",
+        "Repeated reads add database load."
+      ],
+      [
+        "Serve a stale copy",
+        "The service can respond during some failures.",
+        "Use this only when the product permits stale data."
+      ]
+    ],
+    "terms": [
+      [
+        "Cache miss",
+        "The requested item is absent from the cache."
+      ],
+      [
+        "Time-to-live (TTL)",
+        "The time after which a cache entry expires. It does not prevent every race with a database update."
+      ]
+    ],
+    "drill": "A popular product changes price during heavy traffic. How do you keep the page fast and charge the correct price?",
+    "answer": "Cache the product page data. Define how long the page can show an old price. Validate the authoritative price and stock when you create the order. Explain how concurrent updates affect invalidation. Limit database traffic when the cache is unavailable.",
+    "sources": [
+      [
+        "Redis: cache-aside",
+        "https://redis.io/docs/latest/develop/use-cases/cache-aside/"
+      ]
+    ]
+  },
+  "queue": {
+    "name": "Message queues",
+    "label": "02 / RELIABILITY",
+    "title": "Process work after the request.",
+    "intro": "A queue holds work until a worker can process it. Define how the system handles retries and duplicate messages.",
+    "problem": "An image export takes too long to complete during an HTTP request. The user needs a reliable job status.",
+    "requirements": [
+      "Save the job before you report that the system accepted it.",
+      "Recover jobs after a worker stops.",
+      "Prevent duplicate delivery from creating duplicate results.",
+      "Show whether the job is pending, complete, or failed."
+    ],
+    "architecture": {
+      "nodes": [
+        [
+          "Client",
+          "Requests an export"
+        ],
+        [
+          "Job API",
+          "Creates a job"
+        ],
+        [
+          "Database",
+          "Job and outbox records"
+        ],
+        [
+          "Worker",
+          "Processes the export"
+        ],
+        [
+          "Queue",
+          "Holds job messages"
+        ],
+        [
+          "Outbox publisher",
+          "Publishes saved jobs"
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1,
+          "Request"
+        ],
+        [
+          1,
+          2,
+          "One transaction"
+        ],
+        [
+          2,
+          5,
+          "Pending jobs"
+        ],
+        [
+          5,
+          4,
+          "Publish"
+        ],
+        [
+          4,
+          3,
+          "Deliver"
+        ]
+      ]
+    },
+    "sequence": {
+      "title": "Request sequence / Durable job handoff",
+      "actors": [
+        "Job API",
+        "Database",
+        "Publisher",
+        "Queue"
+      ],
+      "steps": [
+        [
+          0,
+          1,
+          "Save job and outbox in one transaction"
+        ],
+        [
+          1,
+          0,
+          "Commit succeeds"
+        ],
+        [
+          0,
+          0,
+          "Return accepted status to the client"
+        ],
+        [
+          2,
+          1,
+          "Read pending outbox entries"
+        ],
+        [
+          1,
+          2,
+          "Return saved job"
+        ],
+        [
+          2,
+          3,
+          "Publish job with stable ID"
+        ],
+        [
+          3,
+          2,
+          "Confirm publication"
+        ],
+        [
+          2,
+          1,
+          "Mark outbox entry as published"
+        ]
+      ]
+    },
+    "recovery": {
+      "title": "Recovery / Worker stops before acknowledgement",
+      "actors": [
+        "Queue",
+        "Worker",
+        "Result store"
+      ],
+      "steps": [
+        [
+          0,
+          1,
+          "Deliver job ID"
+        ],
+        [
+          1,
+          2,
+          "Save result under job ID"
+        ],
+        [
+          2,
+          1,
+          "Result saved"
+        ],
+        [
+          1,
+          1,
+          "Worker stops before acknowledgement"
+        ],
+        [
+          0,
+          1,
+          "Deliver the same job again"
+        ],
+        [
+          1,
+          2,
+          "Find completed result by job ID"
+        ],
+        [
+          2,
+          1,
+          "Return saved result"
+        ],
+        [
+          1,
+          0,
+          "Acknowledge completed job"
+        ]
+      ]
+    },
+    "recoveryNote": "Enforce uniqueness for the saved job result. Use conditional writes or an equivalent atomic operation. External effects need their own idempotency mechanism.",
+    "scenarios": [
+      [
+        "Worker stops",
+        "The queue can deliver the message again. Use the same job ID. Check the durable result before you repeat the work."
+      ],
+      [
+        "Publisher stops",
+        "A publisher can stop after publication but before it marks the outbox entry. It can publish the message again. Consumers must handle duplicates."
+      ],
+      [
+        "Queue grows",
+        "Measure the age of the oldest job. Increase worker capacity within downstream limits. Limit new jobs if processing remains slower than arrival."
+      ]
+    ],
+    "choices": [
+      [
+        "Process during the request",
+        "The client receives a result immediately after processing.",
+        "Long jobs increase request time and timeout risk."
+      ],
+      [
+        "Queue the job",
+        "The request can return after a durable handoff.",
+        "Users need a status check. Workers need a retry policy."
+      ],
+      [
+        "Use an outbox",
+        "Save the job and publication intent in one transaction.",
+        "A separate publisher adds delay and can publish duplicates."
+      ]
+    ],
+    "terms": [
+      [
+        "Outbox",
+        "A database table that stores messages in the same transaction as the related data change."
+      ],
+      [
+        "Acknowledgement",
+        "A worker tells the queue that it has completed a message."
+      ],
+      [
+        "Idempotent operation",
+        "Repeating the same operation does not repeat its intended effect."
+      ]
+    ],
+    "drill": "A worker saves an export, then stops before it acknowledges the message. How do you handle the next delivery?",
+    "answer": "Use the same job ID for each delivery. Find the completed result by that ID. Return the existing result and acknowledge the job. Enforce a unique result or a conditional write to handle concurrent workers. Use a separate mechanism for any external effect that the result store cannot protect.",
+    "sources": [
+      [
+        "AWS: transactional outbox",
+        "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html"
+      ],
+      [
+        "AWS: safe retries",
+        "https://aws.amazon.com/builders-library/making-retries-safe-with-idempotent-APIs/"
+      ]
+    ]
+  },
+  "rate": {
+    "name": "Rate limiting",
+    "label": "03 / PROTECTION",
+    "title": "Control access to shared capacity.",
+    "intro": "A rate limit controls how many requests an identity can send. Select the identity and the policy first.",
+    "problem": "One customer can send enough requests to reduce service capacity for other customers.",
+    "requirements": [
+      "Define a limit for each customer account.",
+      "Apply the limit across all API replicas.",
+      "Define whether short bursts are permitted.",
+      "Select a failure policy for each endpoint."
+    ],
+    "architecture": {
+      "nodes": [
+        [
+          "Client",
+          "Sends an account identity"
+        ],
+        [
+          "API gateway",
+          "Checks the policy"
+        ],
+        [
+          "Application API",
+          "Processes allowed work"
+        ],
+        [
+          "Limit store",
+          "Shared account counters"
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1,
+          "Request"
+        ],
+        [
+          1,
+          2,
+          "Allow"
+        ],
+        [
+          1,
+          3,
+          "Atomic check"
+        ]
+      ]
+    },
+    "sequence": {
+      "title": "Request sequence / Limit permits the request",
+      "actors": [
+        "Client",
+        "Gateway",
+        "Limit store",
+        "API"
+      ],
+      "steps": [
+        [
+          0,
+          1,
+          "Send authenticated request"
+        ],
+        [
+          1,
+          2,
+          "Check and consume one token atomically"
+        ],
+        [
+          2,
+          1,
+          "Allow request"
+        ],
+        [
+          1,
+          3,
+          "Forward request"
+        ],
+        [
+          3,
+          1,
+          "Return result"
+        ],
+        [
+          1,
+          0,
+          "Return result"
+        ]
+      ]
+    },
+    "recovery": {
+      "title": "Failure policy / Limit store is unavailable",
+      "actors": [
+        "Client",
+        "Gateway",
+        "Limit store"
+      ],
+      "steps": [
+        [
+          0,
+          1,
+          "Request an expensive operation"
+        ],
+        [
+          1,
+          2,
+          "Check account limit"
+        ],
+        [
+          1,
+          1,
+          "Limit store request times out"
+        ],
+        [
+          1,
+          1,
+          "Apply the configured reject policy"
+        ],
+        [
+          1,
+          0,
+          "Return temporary service error"
+        ]
+      ]
+    },
+    "recoveryNote": "This example rejects requests while the limit store is unavailable. A public read endpoint can use bounded local limits if its policy permits this. A dependency failure does not prove that the customer exceeded a quota.",
+    "scenarios": [
+      [
+        "Traffic burst",
+        "A token bucket permits a burst up to its capacity. Its refill rate controls the sustained allowance. Choose both values from measured requirements."
+      ],
+      [
+        "More API replicas",
+        "Independent local limits can increase the total allowance when you add replicas. Coordinate the limit when the quota must apply across the service."
+      ],
+      [
+        "Limit store fails",
+        "Select a fallback policy in advance. Reject sensitive operations or permit bounded local traffic. Keep a separate limit on concurrent work."
+      ]
+    ],
+    "choices": [
+      [
+        "Fixed window",
+        "Count requests within each fixed interval.",
+        "Requests near an interval boundary can create a large burst."
+      ],
+      [
+        "Token bucket",
+        "Allow a defined burst and a sustained refill rate.",
+        "It does not enforce an exact rolling-window quota."
+      ],
+      [
+        "Shared state",
+        "Coordinate the allowance across API replicas.",
+        "The shared store adds latency and a failure dependency."
+      ]
+    ],
+    "terms": [
+      [
+        "Token bucket",
+        "A counter with a maximum capacity and a refill rate. A request consumes a token."
+      ],
+      [
+        "HTTP 429",
+        "A response that indicates too many requests. Include Retry-After when you can give a useful retry delay."
+      ]
+    ],
+    "drill": "Each API replica allows 100 requests per second per account. You increase the replica count from two to ten. What can happen?",
+    "answer": "The total allowance can increase from 200 to 1,000 requests per second if requests reach all replicas. Uneven routing can also produce inconsistent results. Coordinate shared state or allocate bounded budgets if the limit must apply across the service. Define the permitted error and failure behavior.",
+    "sources": [
+      [
+        "Redis: rate limiting",
+        "https://redis.io/tutorials/howtos/ratelimiting/"
+      ],
+      [
+        "RFC 6585: HTTP 429",
+        "https://www.rfc-editor.org/rfc/rfc6585#section-4"
+      ]
+    ]
+  },
+  "payment": {
+    "name": "Safe payment retries",
+    "label": "04 / WORKED DESIGN",
+    "title": "Prevent duplicate payment charges.",
+    "intro": "A timeout does not prove that a charge failed. Use a stable payment key to recover an uncertain result.",
+    "problem": "The payment service charges a customer. Your server stops before it saves the result. The customer sends the order request again.",
+    "requirements": [
+      "Assign one stable payment key to each payment operation.",
+      "Enforce a unique request ID within the customer account.",
+      "Save the operation before you request the charge.",
+      "Recover uncertain results before you start another payment operation.",
+      "Reject reuse of a request ID with different order details."
+    ],
+    "architecture": {
+      "nodes": [
+        [
+          "Customer",
+          "Retries the same request"
+        ],
+        [
+          "Order API",
+          "Reuses the payment key"
+        ],
+        [
+          "Payment service",
+          "Deduplicates by key"
+        ],
+        [
+          "Operation database",
+          "Unique account + request ID"
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1,
+          "Order request"
+        ],
+        [
+          1,
+          2,
+          "Charge with key"
+        ],
+        [
+          1,
+          3,
+          "Save operation"
+        ]
+      ]
+    },
+    "sequence": {
+      "title": "Request sequence / Successful payment",
+      "actors": [
+        "Customer",
+        "Order API",
+        "Database",
+        "Payment service"
+      ],
+      "steps": [
+        [
+          0,
+          1,
+          "Place order with request ID"
+        ],
+        [
+          1,
+          2,
+          "Save pending operation and payment key"
+        ],
+        [
+          2,
+          1,
+          "Commit succeeds"
+        ],
+        [
+          1,
+          3,
+          "Charge with the saved payment key"
+        ],
+        [
+          3,
+          1,
+          "Return successful payment result"
+        ],
+        [
+          1,
+          2,
+          "Save result and update order state"
+        ],
+        [
+          1,
+          0,
+          "Confirm order"
+        ]
+      ]
+    },
+    "recovery": {
+      "title": "Recovery / Charge succeeds before the server stops",
+      "actors": [
+        "Customer",
+        "Order API",
+        "Database",
+        "Payment service"
+      ],
+      "steps": [
+        [
+          1,
+          3,
+          "Charge with saved payment key"
+        ],
+        [
+          3,
+          1,
+          "Charge succeeds"
+        ],
+        [
+          1,
+          1,
+          "Server stops before saving the result"
+        ],
+        [
+          0,
+          1,
+          "Retry with the same request ID"
+        ],
+        [
+          1,
+          2,
+          "Read the saved operation"
+        ],
+        [
+          2,
+          1,
+          "Return pending status and payment key"
+        ],
+        [
+          1,
+          3,
+          "Retry with the same payment key"
+        ],
+        [
+          3,
+          1,
+          "Return existing payment result"
+        ],
+        [
+          1,
+          2,
+          "Save result and update order state"
+        ],
+        [
+          1,
+          0,
+          "Confirm order"
+        ]
+      ]
+    },
+    "recoveryNote": "The payment service must support idempotent retries. Reuse the same key and request details within its retention period. If the key expires, reconcile the payment before you attempt another charge.",
+    "scenarios": [
+      [
+        "Server stops",
+        "Read the saved operation after restart. Reuse its payment key to recover the result. Show pending status until the result is known."
+      ],
+      [
+        "Concurrent retries",
+        "Use a unique database constraint on the account and request ID. Return the existing operation on conflict. Validate that the request details match."
+      ],
+      [
+        "Payment key expires",
+        "Do not assume a retry is still deduplicated. Reconcile with the payment service. Keep the order pending or send it for review if the result remains unknown."
+      ]
+    ],
+    "choices": [
+      [
+        "Create a new key on retry",
+        "The payment service can treat it as a new operation.",
+        "This can cause a second charge. Do not use it for an uncertain payment."
+      ],
+      [
+        "Reuse the saved key",
+        "The provider can return the earlier result under its idempotency contract.",
+        "The request must match. Retention and error rules depend on the provider."
+      ],
+      [
+        "Reconcile pending payments",
+        "Recover payments after failures or missed responses.",
+        "The system needs status checks and a policy for unresolved cases."
+      ]
+    ],
+    "terms": [
+      [
+        "Idempotency key",
+        "An identifier that lets a service recognize retries of the same operation."
+      ],
+      [
+        "Reconcile",
+        "Compare the stored operation with the payment service result and resolve differences."
+      ]
+    ],
+    "drill": "The charge succeeded, but your server did not save the response. What must the next request do?",
+    "answer": "Find the saved operation by account and request ID. Validate that the order details match. Reuse the stored payment key within the provider's retention period. Save the recovered result and update the order state. If the result remains unknown, show pending status. Do not create a new charge merely because the first request timed out.",
+    "sources": [
+      [
+        "AWS: safe retries",
+        "https://aws.amazon.com/builders-library/making-retries-safe-with-idempotent-APIs/"
+      ]
+    ]
+  }
+};
