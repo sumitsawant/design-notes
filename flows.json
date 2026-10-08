@@ -1,0 +1,54 @@
+{
+  "payment": {
+    "title": ["One order.", "One safe retry."],
+    "intro": "Follow a payment when the response is lost. See how one key prevents a second charge.",
+    "nodes": [["Customer", "Sends an order"], ["Order API", "Uses one payment key"], ["Payment service", "Recognizes the key"], ["Operation store", "Saves key and status"]],
+    "steps": [
+      {"tag":"CUSTOMER","title":"Start with the request.","body":"The customer places an order. The request includes a stable ID. A retry will use the same ID.","label":"The customer sends an order.","note":"The request includes a stable request ID.","nodes":[0,1],"edges":["request"]},
+      {"tag":"ORDER API","title":"Save before you charge.","body":"The API creates a pending operation. It stores a payment key with the request ID. The store enforces a unique request ID for each customer.","label":"The API stores the operation.","note":"The request ID and payment key are saved together.","nodes":[1,3],"edges":["store"]},
+      {"tag":"PAYMENT SERVICE","title":"Charge with the saved key.","body":"The API sends the payment key to the payment service. The service uses this key to identify the operation.","label":"The API sends the payment key.","note":"The payment service uses the key to identify the charge.","nodes":[1,2],"edges":["charge"]},
+      {"tag":"FAILURE","title":"The response is lost.","body":"The charge succeeds. The API stops before it saves the result. The stored operation still says “pending.”","label":"The charge succeeds. The API stops.","note":"The result is lost. The saved operation remains pending.","nodes":[2,1],"edges":["result"],"failure":true},
+      {"tag":"RETRY","title":"Find the first operation.","body":"The customer retries with the same request ID. The API reads the pending operation and gets its original payment key.","label":"The customer retries.","note":"The API reads the original payment key.","nodes":[0,1,3],"edges":["request","lookup"]},
+      {"tag":"RECOVERY","title":"Recover the result.","body":"The API retries with the same payment key. Under the service’s idempotency rules, it gets the existing result. It saves the result and confirms the order.","caveat":"If the key has expired, the API must reconcile the charge before it starts a new operation.","label":"The API recovers the result.","note":"The same key returns the existing payment result.","nodes":[1,2,3],"edges":["charge","result","store"]}
+    ]
+  },
+  "cache": {
+    "title": ["One product.", "One faster read."],
+    "intro": "Follow a cache miss, then a cache hit. See where fresh data still matters.",
+    "nodes": [["Customer", "Requests a product"], ["Product API", "Chooses the source"], ["Cache", "Keeps a short copy"], ["Database", "Stores source data"]],
+    "steps": [
+      {"tag":"REQUEST","title":"Ask for a product.","body":"The customer opens a product page. The API receives an item ID and asks the cache for the item.","label":"The customer requests an item.","note":"The API uses the item ID as the cache key.","nodes":[0,1],"edges":["request"]},
+      {"tag":"CACHE MISS","title":"Check the cache.","body":"The key is absent. The cache cannot answer this request, so the API must read the source data.","label":"The cache reports a miss.","note":"A miss sends this request to the database.","nodes":[1,2],"edges":["charge"]},
+      {"tag":"DATABASE","title":"Read the source.","body":"The API reads the product from the database. The database remains the source of truth.","label":"The API reads the database.","note":"The response contains the current stored product.","nodes":[1,3],"edges":["store"]},
+      {"tag":"CACHE FILL","title":"Save a short copy.","body":"The API places the product in the cache with an expiry time. It then returns the product to the customer.","label":"The API fills the cache.","note":"The copy has a defined lifetime.","nodes":[1,2],"edges":["charge"]},
+      {"tag":"CACHE HIT","title":"Serve the next read.","body":"The next request finds the item in the cache. The API can answer without a database read.","label":"The cache returns the product.","note":"The faster path can return data that is briefly stale.","nodes":[0,1,2],"edges":["request","result"]},
+      {"tag":"WRITE CHECK","title":"Check critical values again.","body":"When the customer places an order, the order path checks price and stock against authoritative data. A page-view cache is not enough for this decision.","label":"The order path checks the source.","note":"Do not use a stale page copy to confirm stock or price.","nodes":[1,3],"edges":["store","lookup"]}
+    ]
+  },
+  "queue": {
+    "title": ["One job.", "One safe redelivery."],
+    "intro": "Follow a queued task when a worker stops. See why delivery and completion are separate.",
+    "nodes": [["Client", "Submits a job"], ["Job API", "Accepts the request"], ["Worker", "Runs the task"], ["Queue", "Stores the message"]],
+    "steps": [
+      {"tag":"SUBMIT","title":"Accept the job.","body":"The client submits work that can finish after the request ends. The API assigns a stable job ID.","label":"The client submits a job.","note":"A stable ID helps detect repeated work.","nodes":[0,1],"edges":["request"]},
+      {"tag":"ENQUEUE","title":"Save the message.","body":"The API writes a message to the queue. It confirms acceptance only after the queue accepts the message.","label":"The API sends the job to the queue.","note":"The message carries the job ID and required input.","nodes":[1,3],"edges":["store"]},
+      {"tag":"DELIVER","title":"Give work to a worker.","body":"A worker receives the message. The queue keeps it available for redelivery until it is acknowledged.","label":"The worker receives the job.","note":"Receipt is not proof that the job finished.","nodes":[3,2],"edges":["lookup"]},
+      {"tag":"FAILURE","title":"The worker stops.","body":"The worker stops before it acknowledges the message. The queue makes the message available again after its visibility period.","label":"The worker fails before acknowledgement.","note":"The message can be delivered again.","nodes":[2,3],"edges":["lookup"],"failure":true},
+      {"tag":"REDELIVERY","title":"Run the job again.","body":"Another worker receives the same job ID. It checks completed work before repeating an external effect.","label":"A second worker checks the job ID.","note":"Consumers must tolerate duplicate delivery.","nodes":[3,2],"edges":["lookup"]},
+      {"tag":"ACKNOWLEDGE","title":"Mark completion.","body":"After the effect and its result are recorded, the worker acknowledges the message. A failed job can move to a dead-letter queue after a defined retry limit.","label":"The worker acknowledges the job.","note":"A retry limit keeps poison messages from looping forever.","nodes":[2,3],"edges":["lookup"]}
+    ]
+  },
+  "rate": {
+    "title": ["One request.", "One fair limit."],
+    "intro": "Follow a request through a rate limiter. See what changes when the counter store fails.",
+    "nodes": [["Client", "Sends a request"], ["Gateway", "Checks the limit"], ["Service", "Handles allowed work"], ["Counter store", "Tracks the window"]],
+    "steps": [
+      {"tag":"REQUEST","title":"Identify the caller.","body":"The client sends a request. The gateway selects a limit key such as an authenticated account ID.","label":"The gateway identifies the caller.","note":"The key controls which requests share a limit.","nodes":[0,1],"edges":["request"]},
+      {"tag":"COUNTER","title":"Check the current window.","body":"The gateway checks the caller’s count in the counter store. It uses an atomic operation so concurrent requests do not all pass the same limit.","label":"The gateway checks the count.","note":"The check and update must be atomic.","nodes":[1,3],"edges":["store"]},
+      {"tag":"ALLOW","title":"Forward allowed work.","body":"If the count is below the limit, the gateway updates it and forwards the request to the service.","label":"The gateway allows the request.","note":"The service receives only permitted work.","nodes":[1,2],"edges":["charge"]},
+      {"tag":"REJECT","title":"Stop excess work.","body":"When the caller reaches the limit, the gateway returns a rate-limit response and a retry hint. It does not forward the request.","label":"The gateway rejects excess work.","note":"The client can wait before it retries.","nodes":[0,1,3],"edges":["request","lookup"]},
+      {"tag":"STORE FAILURE","title":"Define a failure rule.","body":"If the counter store is unavailable, the gateway follows a documented fail-open or fail-closed rule for this endpoint.","label":"The counter store is unavailable.","note":"The fallback depends on the cost and risk of this endpoint.","nodes":[1,3],"edges":["store"],"failure":true},
+      {"tag":"RECOVERY","title":"Resume normal checks.","body":"When the store returns, the gateway resumes atomic checks. It monitors rejected requests and store errors to detect an unsafe limit.","label":"The gateway resumes checks.","note":"Monitor both rejection rate and counter-store health.","nodes":[1,3,2],"edges":["store","charge"]}
+    ]
+  }
+}

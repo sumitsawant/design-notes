@@ -2,7 +2,7 @@
 
 Original visual system design lessons at https://learn.e2e.work/.
 
-The public preview contains four design guides: caching, message queues, rate limiting, and safe payment retries. Each includes architecture flow, tradeoffs, failure scenarios, an interview drill, and primary references. There is no checkout or paid product yet.
+The public preview contains four design guides and four scroll walkthroughs: caching, message queues, rate limiting, and safe payment retries. Each guide includes architecture flow, tradeoffs, failure scenarios, an interview drill, and primary references. The [100-system catalog](editorial/catalog.csv) is an editorial roadmap: 96 entries are planned, not published. There is no checkout or paid product yet.
 
 ## Preview
 
@@ -12,7 +12,7 @@ Run `python3 -m http.server 4173` and open http://localhost:4173.
 
 GitHub Actions validates JavaScript syntax, packages only public site assets, and deploys main to GitHub Pages. In Settings → Pages, select GitHub Actions and set the custom domain to `learn.e2e.work`. Enable HTTPS when the certificate is available. The Namecheap CNAME points to `sumitsawant.github.io`.
 
-No personal account credentials or runtime secrets are required. Only the four published samples belong in this public repository; keep any future paid downloads elsewhere.
+No personal account credentials or runtime secrets are required. Only published samples belong in this public repository; keep any future paid downloads elsewhere.
 
 ## Content and corrections
 
@@ -30,6 +30,8 @@ Editable Figma identity: https://www.figma.com/design/qA814U1O7Nbi774aNdc134
 
 Edit `lessons.json`, then run `python3 scripts/build_diagrams.py`. This creates `lessons.js` and 12 SVG diagrams. Commit the source and generated files together. The deployment checks that generated files match their source.
 
+Edit `flows.json`, then run `python3 scripts/build_flows.py`. This validates each walkthrough and creates `flows.js`. The shared scroll renderer supports each published system. `python3 scripts/validate_catalog.py` checks that the 100-system roadmap marks only systems with a guide and flow as published. The [production plan](editorial/production.md) defines the review gate for each new system.
+
 Each lesson contains a problem, requirements, a system diagram, a request sequence, a failure recovery sequence, design choices, and a practice answer. Diagrams have text alternatives. Printing includes sequence transcripts and the answer. Writing uses short sentences and consistent terms; full ASD-STE100 dictionary compliance has not been audited.
 
 ## Reading view
@@ -42,4 +44,4 @@ The cover uses a small WebGL shader for a decorative system field. It uses no ex
 
 ## Scroll walkthrough
 
-The home page includes an original payment flow. `flow-scroll.js` reads the visible step and highlights the matching component and connection. The text remains in document order without JavaScript. Reduced motion leaves the state changes in place and removes moving path animation.
+The home page includes four original scroll walkthroughs. `flow-scroll.js` reads the visible step and highlights the matching component and connection. The payment example remains as readable fallback markup without JavaScript. Reduced motion leaves the state changes in place and removes moving path animation.

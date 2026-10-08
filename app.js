@@ -95,8 +95,8 @@ function route() {
     openHome();
     requestAnimationFrame(() => {
       const section=document.getElementById(target);
-      if (target === 'flow') {
-        const layout=section.querySelector('.flow-layout');
+      if (target === 'flow' || target.startsWith('flow-')) {
+        const layout=document.getElementById('flow').querySelector('.flow-layout');
         window.scrollTo({top:window.scrollY+layout.getBoundingClientRect().top-(matchMedia('(max-width:760px)').matches?77:105),behavior:'instant'});
       } else if(section && target !== 'lesson' && !target.startsWith('section-')) section.scrollIntoView();
       else window.scrollTo({top:0,behavior:'instant'});

@@ -19,13 +19,16 @@ jobs:
           node --check app.js
           node --check hero-webgl.js
           node --check flow-scroll.js
+          node --check flows.js
           node --check lessons.js
           python3 scripts/build_diagrams.py
-          git diff --exit-code -- lessons.js diagrams
+          python3 scripts/build_flows.py
+          python3 scripts/validate_catalog.py
+          git diff --exit-code -- lessons.js flows.js diagrams
       - name: Assemble static site
         run: |
           mkdir _site
-          cp index.html styles.css app.js hero-webgl.js flow-scroll.js lessons.js logo.svg CNAME _site/
+          cp index.html styles.css app.js hero-webgl.js flow-scroll.js flows.js lessons.js logo.svg CNAME _site/
           cp -R diagrams _site/
           touch _site/.nojekyll
       - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
