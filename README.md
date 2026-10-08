@@ -39,3 +39,7 @@ The home page introduces the guide. Lesson links open a separate reading view wi
 ## Cover effect
 
 The cover uses a small WebGL shader for a decorative system field. It uses no external library or credential. CSS supplies the static cover when WebGL is unavailable. The shader draws one frame when reduced motion is enabled. It pauses while the cover is off-screen or the tab is hidden.
+
+## Scroll walkthrough
+
+The home page includes an original payment flow. `flow-scroll.js` reads the visible step and highlights the matching component and connection. The text remains in document order without JavaScript. Reduced motion leaves the state changes in place and removes moving path animation.
