@@ -4,7 +4,7 @@ from html import escape
 import json
 
 ROOT = Path(__file__).resolve().parents[1]
-INK, MINT, PAPER, LINE = '#242925', '#dfeee6', '#faf9f5', '#8b978b'
+INK, MINT, PAPER, LINE = '#294637', '#edf4ed', '#ffffff', '#a5b8a9'
 def text(x,y,value,size=15,anchor='middle',color=INK,halo=False):
     return f'<text x="{x}" y="{y}" fill="{color}" font-family="Arial, sans-serif" font-size="{size}" text-anchor="{anchor}" paint-order="stroke" stroke="{PAPER}" stroke-width="{4 if halo else 0}" stroke-linejoin="round">{escape(value)}</text>'
 def svg(title,description,body,height):
@@ -20,7 +20,7 @@ def sequence(title,actors,steps):
     for i,(sender,receiver,label) in enumerate(steps):
         y=130+i*68;a=xs[sender];z=xs[receiver]
         if sender==receiver:
-            b+=f'<rect x="15" y="{y-25}" width="870" height="44" rx="5" fill="#f6ded0"/>'
+            b+=f'<rect x="15" y="{y-25}" width="870" height="44" rx="5" fill="#f4ebda"/>'
             b+=text(450,y+2,f'{i+1}. {label}',14)
         else:
             b+=text((a+z)/2,y-10,f'{i+1}. {label}',14,halo=True)
@@ -41,7 +41,7 @@ def architecture(title,nodes,edges):
             path=f'M{x1} {y1}V{(y1+y2)/2}H{x2}V{y2}';lx=(x1+x2)/2+10;ly=(y1+y2)/2-12
         b+=f'<path d="{path}" fill="none" stroke="{INK}" stroke-width="1.6" marker-end="url(#arrow)"/>'+text(lx,ly,label,12,halo=True)
     for (name,note),(x,y) in zip(nodes,positions):
-        b+=f'<rect x="{x}" y="{y}" width="190" height="68" rx="8" fill="{MINT if name not in ["Client","Customer"] else "#eeeee6"}" stroke="#bdcbbb"/>'
+        b+=f'<rect x="{x}" y="{y}" width="190" height="68" rx="8" fill="{MINT if name not in ["Client","Customer"] else "#eeeee6"}" stroke="#ccdbcc"/>'
         b+=text(x+95,y+28,name,17)+text(x+95,y+49,note,12,color='#62675f')
     desc=' '.join(f'{nodes[a][0]} to {nodes[z][0]}: {label}.' for a,z,label in edges)
     return svg(title,desc,b,400 if len(nodes)>3 else 225)

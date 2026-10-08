@@ -31,3 +31,7 @@ Editable Figma identity: https://www.figma.com/design/qA814U1O7Nbi774aNdc134
 Edit `lessons.json`, then run `python3 scripts/build_diagrams.py`. This creates `lessons.js` and 12 SVG diagrams. Commit the source and generated files together. The deployment checks that generated files match their source.
 
 Each lesson contains a problem, requirements, a system diagram, a request sequence, a failure recovery sequence, design choices, and a practice answer. Diagrams have text alternatives. Printing includes sequence transcripts and the answer. Writing uses short sentences and consistent terms; full ASD-STE100 dictionary compliance has not been audited.
+
+## Reading view
+
+The home page introduces the guide. Lesson links open a separate reading view with a lesson index, section links, a PDF control, and next-lesson navigation. Read status is stored in browser localStorage. No account or server is required. If browser storage is unavailable, progress lasts for the current session.
